@@ -1,38 +1,19 @@
-declare const process: {
-  env: Record<string, string | undefined>;
-};
+const XAI_CLIENT_SECRETS_URL = 'https://api.x.ai/v1/realtime/client_secrets';
 
-type VercelRequest = {
-  method?: string;
-};
+const noStoreHeaders = { 'Cache-Control': 'no-store' } as const;
 
-type VercelResponse = {
-  status: (statusCode: number) => VercelResponse;
-  setHeader: (name: string, value: string) => void;
-  json: (body: unknown) => void;
-  send: (body: string) => void;
-};
-
-export default async function handler(
-  request: VercelRequest,
-  response: VercelResponse,
-) {
-  response.setHeader('Cache-Control', 'no-store');
-
-  if (request.method !== 'GET' && request.method !== 'POST') {
-    response.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const apiKey = process.env.XAI_API_KEY;
+async function handleTokenRequest(): Promise<Response> {
+  const apiKey = process.env.XAI_API_KEY?.trim();
 
   if (!apiKey) {
-    response.status(500).json({ error: 'Missing XAI_API_KEY in environment.' });
-    return;
+    return Response.json(
+      { error: 'Missing XAI_API_KEY in environment.' },
+      { status: 500, headers: noStoreHeaders },
+    );
   }
 
   try {
-    const xaiResponse = await fetch('https://api.x.ai/v1/realtime/client_secrets', {
+    const xaiResponse = await fetch(XAI_CLIENT_SECRETS_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -46,9 +27,26 @@ export default async function handler(
     });
 
     const body = await xaiResponse.text();
-    response.setHeader('Content-Type', 'application/json');
-    response.status(xaiResponse.status).send(body);
-  } catch {
-    response.status(502).json({ error: 'Could not create xAI realtime token.' });
+    return new Response(body, {
+      status: xaiResponse.status,
+      headers: {
+        'Content-Type': 'application/json',
+        ...noStoreHeaders,
+      },
+    });
+  } catch (error) {
+    console.error('realtime-token: xAI request failed', error);
+    return Response.json(
+      { error: 'Could not create xAI realtime token.' },
+      { status: 502, headers: noStoreHeaders },
+    );
   }
+}
+
+export async function GET(): Promise<Response> {
+  return handleTokenRequest();
+}
+
+export async function POST(): Promise<Response> {
+  return handleTokenRequest();
 }
