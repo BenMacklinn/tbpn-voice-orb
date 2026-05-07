@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const XAI_REALTIME_URL =
   'wss://api.x.ai/v1/realtime?model=grok-voice-think-fast-1.0';
 const TARGET_SAMPLE_RATE = 24_000;
+const MAX_REALTIME_CONNECT_ATTEMPTS = 3;
 
 export type GrokVoicePhase =
   | 'idle'
@@ -102,6 +103,10 @@ async function createRealtimeToken() {
   }
 
   return data.value;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export function useGrokVoice() {
@@ -432,66 +437,94 @@ export function useGrokVoice() {
     stopRequestedRef.current = false;
 
     try {
-      const [token] = await Promise.all([createRealtimeToken(), startAudioCapture()]);
+      await startAudioCapture();
+
+      const connectRealtime = async (attempt = 1): Promise<void> => {
+        const token = await createRealtimeToken();
+
+        if (stopRequestedRef.current) {
+          return;
+        }
+
+        let opened = false;
+        const websocket = new WebSocket(XAI_REALTIME_URL, [
+          `xai-client-secret.${token}`,
+        ]);
+        websocketRef.current = websocket;
+
+        websocket.onopen = () => {
+          opened = true;
+          websocket.send(
+            JSON.stringify({
+              type: 'session.update',
+              session: {
+                instructions:
+                  'You are a concise, conversational voice assistant. Keep spoken replies brief unless the user asks for detail.',
+                voice: 'leo',
+                turn_detection: {
+                  type: 'server_vad',
+                },
+                audio: {
+                  input: {
+                    format: {
+                      type: 'audio/pcm',
+                      rate: sampleRateRef.current,
+                    },
+                  },
+                  output: {
+                    format: {
+                      type: 'audio/pcm',
+                      rate: sampleRateRef.current,
+                    },
+                  },
+                },
+              },
+            }),
+          );
+          setError(null);
+          setPhase('listening');
+        };
+
+        websocket.onmessage = (message) => {
+          const event = JSON.parse(String(message.data)) as XaiRealtimeEvent;
+          handleRealtimeEvent(event);
+        };
+
+        websocket.onerror = () => {
+          if (opened) {
+            setError('Grok voice connection failed.');
+          }
+        };
+
+        websocket.onclose = () => {
+          if (stopRequestedRef.current) {
+            return;
+          }
+
+          if (!opened && attempt < MAX_REALTIME_CONNECT_ATTEMPTS) {
+            websocketRef.current = null;
+            setPhase('connecting');
+            void wait(350 * attempt).then(() => {
+              if (!stopRequestedRef.current) {
+                void connectRealtime(attempt + 1);
+              }
+            });
+            return;
+          }
+
+          cleanupSession();
+          setIsActive(false);
+          setPhase('idle');
+          setError(opened ? 'Grok voice disconnected.' : 'Grok voice connection failed.');
+        };
+      };
 
       if (stopRequestedRef.current) {
         cleanupSession();
         return false;
       }
 
-      const websocket = new WebSocket(XAI_REALTIME_URL, [
-        `xai-client-secret.${token}`,
-      ]);
-      websocketRef.current = websocket;
-
-      websocket.onopen = () => {
-        websocket.send(
-          JSON.stringify({
-            type: 'session.update',
-            session: {
-              instructions:
-                'You are a concise, conversational voice assistant. Keep spoken replies brief unless the user asks for detail.',
-              voice: 'leo',
-              turn_detection: {
-                type: 'server_vad',
-              },
-              audio: {
-                input: {
-                  format: {
-                    type: 'audio/pcm',
-                    rate: sampleRateRef.current,
-                  },
-                },
-                output: {
-                  format: {
-                    type: 'audio/pcm',
-                    rate: sampleRateRef.current,
-                  },
-                },
-              },
-            },
-          }),
-        );
-        setPhase('listening');
-      };
-
-      websocket.onmessage = (message) => {
-        const event = JSON.parse(String(message.data)) as XaiRealtimeEvent;
-        handleRealtimeEvent(event);
-      };
-
-      websocket.onerror = () => {
-        setError('Grok voice connection failed.');
-      };
-
-      websocket.onclose = () => {
-        if (!stopRequestedRef.current) {
-          cleanupSession();
-          setIsActive(false);
-          setPhase('idle');
-          setError('Grok voice disconnected.');
-        }
-      };
+      await connectRealtime();
 
       return true;
     } catch (startError) {
