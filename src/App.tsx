@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { VoiceOrb, type OrbState } from './components/VoiceOrb';
-import { useAudioLevel } from './hooks/useAudioLevel';
+import { type GrokVoicePhase, useGrokVoice } from './hooks/useGrokVoice';
 
 const stateOptions: Array<{
   id: OrbState;
@@ -24,12 +24,34 @@ const stateOptions: Array<{
   },
 ];
 
+const phaseLabels: Record<GrokVoicePhase, string> = {
+  idle: 'Ready',
+  connecting: 'Connecting…',
+  listening: 'Listening',
+  processing: 'Thinking',
+  speaking: 'Speaking',
+};
+
+const phaseToOrbState: Record<GrokVoicePhase, OrbState> = {
+  idle: 'idle',
+  connecting: 'processing',
+  listening: 'listening',
+  processing: 'processing',
+  speaking: 'speaking',
+};
+
 function App() {
-  const [orbState, setOrbState] = useState<OrbState>('idle');
+  const [demoOrbState, setDemoOrbState] = useState<OrbState>('idle');
   const [demoLevel, setDemoLevel] = useState(0);
-  const { level, isListening, error, start, stop } = useAudioLevel();
+  const grokVoice = useGrokVoice();
+  const orbState = grokVoice.isActive ? phaseToOrbState[grokVoice.phase] : demoOrbState;
 
   useEffect(() => {
+    if (grokVoice.isActive && orbState === 'speaking') {
+      setDemoLevel(0);
+      return;
+    }
+
     if (orbState !== 'speaking' && orbState !== 'processing') {
       setDemoLevel(0);
       return;
@@ -52,51 +74,50 @@ function App() {
 
     frame = requestAnimationFrame(animateDemoLevel);
     return () => cancelAnimationFrame(frame);
-  }, [orbState]);
+  }, [grokVoice.isActive, orbState]);
 
   const orbLevel = useMemo(() => {
     if (orbState === 'listening') {
-      return isListening ? level : 0.18;
+      return grokVoice.isActive ? grokVoice.level : 0.18;
+    }
+
+    if (grokVoice.isActive && orbState === 'speaking') {
+      return grokVoice.outputLevel;
     }
 
     if (orbState === 'speaking' || orbState === 'processing') {
-      return Math.max(level * 0.65, demoLevel);
+      return Math.max(grokVoice.level * 0.65, demoLevel);
     }
 
-    return level * 0.2;
-  }, [demoLevel, isListening, level, orbState]);
+    return grokVoice.level * 0.2;
+  }, [demoLevel, grokVoice.isActive, grokVoice.level, grokVoice.outputLevel, orbState]);
 
-  const handleMicToggle = async () => {
-    if (isListening) {
-      stop();
-      if (orbState === 'listening') {
-        setOrbState('idle');
-      }
+  const handleVoiceToggle = async () => {
+    if (grokVoice.isActive) {
+      grokVoice.stop();
       return;
     }
 
-    const didStart = await start();
-    if (didStart) {
-      setOrbState('listening');
-    }
+    await grokVoice.start();
   };
 
   const handleStateChange = (nextState: OrbState) => {
-    setOrbState(nextState);
+    setDemoOrbState(nextState);
   };
 
   return (
     <main className="app-shell">
       <div className="studio-backdrop" />
-      <VoiceOrb state={orbState} level={orbLevel} micActive={isListening} />
+      <VoiceOrb state={orbState} level={orbLevel} micActive={grokVoice.isActive} />
 
       <section className="control-panel" aria-label="Voice orb controls">
-        {error ? <p className="error-message">{error}</p> : null}
+        {grokVoice.error ? <p className="error-message">{grokVoice.error}</p> : null}
 
         <div className="state-grid">
           {stateOptions.map((option) => (
             <button
               className={option.id === orbState ? 'state-card is-active' : 'state-card'}
+              disabled={grokVoice.isActive}
               key={option.id}
               type="button"
               onClick={() => handleStateChange(option.id)}
@@ -106,12 +127,27 @@ function App() {
           ))}
         </div>
 
-        <button className="mic-button" type="button" onClick={handleMicToggle}>
-          {isListening ? 'Stop mic' : 'Start mic'}
+        <button
+          className={grokVoice.isActive ? 'mic-button is-active' : 'mic-button'}
+          type="button"
+          onClick={handleVoiceToggle}
+        >
+          {grokVoice.isActive ? 'Stop Orb' : 'Start Orb'}
         </button>
 
-        <div className="level-meter" aria-label={`Microphone level ${Math.round(level * 100)}%`}>
-          <span style={{ transform: `scaleX(${Math.max(0.04, level)})` }} />
+        <div className="voice-status" aria-live="polite">
+          <span>{phaseLabels[grokVoice.phase]}</span>
+          <p>
+            {grokVoice.assistantTranscript ||
+              'Tap Start Orb, allow the mic, then speak.'}
+          </p>
+        </div>
+
+        <div
+          className="level-meter"
+          aria-label={`Microphone level ${Math.round(grokVoice.level * 100)}%`}
+        >
+          <span style={{ transform: `scaleX(${Math.max(0.04, grokVoice.level)})` }} />
         </div>
       </section>
     </main>

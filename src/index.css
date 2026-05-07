@@ -215,6 +215,7 @@ button {
   filter: blur(0.2px);
   opacity: var(--grid-opacity);
   animation: gridDrift 16s linear infinite;
+  transition: opacity 360ms ease, filter 360ms ease;
 }
 
 .orb-shadow {
@@ -227,6 +228,7 @@ button {
   filter: blur(22px);
   opacity: 0.86;
   transform: scaleX(var(--shadow-scale));
+  transition: transform 360ms ease, opacity 360ms ease;
 }
 
 .orb-rings,
@@ -236,6 +238,7 @@ button {
   display: grid;
   place-items: center;
   pointer-events: none;
+  transition: transform 220ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .orb-rings span {
@@ -247,6 +250,10 @@ button {
   opacity: var(--ring-opacity);
   transform: scale(0.88);
   animation: ripple 3.2s ease-out infinite;
+  transition:
+    border-color 360ms ease,
+    opacity 360ms ease,
+    width 360ms ease;
 }
 
 .orb-rings span:nth-child(2) {
@@ -274,6 +281,12 @@ button {
     translateX(var(--particle-radius));
   animation: particleOrbit 4.6s linear infinite;
   animation-delay: var(--particle-delay);
+  transition:
+    background-color 360ms ease,
+    box-shadow 360ms ease,
+    opacity 360ms ease,
+    transform 360ms ease,
+    width 360ms ease;
 }
 
 .orb-core {
@@ -291,6 +304,9 @@ button {
   place-items: center;
   transform: translateY(var(--orb-float-y)) scale(var(--orb-scale));
   animation: orbBreathe 6.4s ease-in-out infinite;
+  transition:
+    filter 360ms ease,
+    transform 220ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .orb-core::before {
@@ -309,6 +325,7 @@ button {
     );
   opacity: var(--aurora-opacity);
   animation: auroraSpin 7s linear infinite;
+  transition: opacity 360ms ease;
 }
 
 .orb-aurora,
@@ -332,6 +349,7 @@ button {
     linear-gradient(145deg, rgb(239 243 250 / 72%), rgb(0 229 192 / 46%) 42%, rgb(2 4 4 / 28%) 100%);
   mix-blend-mode: screen;
   opacity: var(--aurora-opacity);
+  transition: opacity 360ms ease;
 }
 
 .orb-surface {
@@ -347,6 +365,11 @@ button {
     inset -30px -24px 74px rgb(2 4 4 / 62%);
   backdrop-filter: blur(8px);
   animation: surfaceMorph 6s ease-in-out infinite;
+  transition:
+    border-color 360ms ease,
+    box-shadow 360ms ease,
+    opacity 360ms ease,
+    transform 360ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .orb-surface::after {
@@ -378,6 +401,10 @@ button {
     scale(0.96);
   transform-origin: center;
   animation: markPressure 6s ease-in-out infinite;
+  transition:
+    filter 360ms ease,
+    opacity 360ms ease,
+    transform 360ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .orb-mark::selection {
@@ -404,6 +431,9 @@ button {
   gap: 5px;
   opacity: 0;
   transform: translateY(35%);
+  transition:
+    opacity 320ms ease,
+    transform 360ms cubic-bezier(0.22, 0.8, 0.24, 1);
 }
 
 .orb-waveform span {
@@ -415,14 +445,26 @@ button {
   transform: scaleY(var(--bar-mid-scale));
   animation: waveformPulse 0.66s ease-in-out infinite;
   animation-delay: var(--bar-delay);
+  transition:
+    box-shadow 360ms ease,
+    height 320ms ease,
+    transform 220ms ease;
+}
+
+.state-idle .particle-field {
+  animation: particleFieldBreathe 6.4s ease-in-out infinite;
 }
 
 .state-listening .orb-core {
-  animation: listeningPulse 0.42s ease-out infinite alternate;
+  animation: listeningPulse 0.72s cubic-bezier(0.22, 0.8, 0.24, 1) infinite alternate;
+}
+
+.state-listening .particle-field {
+  animation: particleFieldListeningPulse 0.72s cubic-bezier(0.22, 0.8, 0.24, 1) infinite alternate;
 }
 
 .state-listening .orb-surface {
-  animation: reactiveSurface 0.76s ease-in-out infinite alternate;
+  animation: reactiveSurface 1.05s ease-in-out infinite alternate;
 }
 
 .state-processing .particle-field span {
@@ -433,8 +475,19 @@ button {
   animation: processingFocus 2.7s ease-in-out infinite;
 }
 
+.state-processing .particle-field {
+  animation: none;
+  transform: translateY(0);
+}
+
 .state-speaking .orb-core {
-  animation: speakingPulse 0.86s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation: none;
+  transform: translateY(var(--orb-speaking-y)) scale(var(--orb-speaking-scale));
+  transition: transform 145ms cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.state-speaking .particle-field {
+  transform: translateY(var(--orb-speaking-y));
 }
 
 .state-speaking .orb-waveform,
@@ -443,7 +496,26 @@ button {
 }
 
 .state-speaking .orb-waveform span {
-  animation-duration: 0.42s;
+  animation: waveformPulse 0.66s ease-in-out infinite;
+  animation-delay: var(--bar-delay);
+}
+
+.voice-orb.is-transitioning .orb-core,
+.voice-orb.is-transitioning .orb-surface,
+.voice-orb.is-transitioning .particle-field {
+  animation: none;
+}
+
+.voice-orb.is-transitioning .orb-core {
+  transition:
+    filter 420ms ease,
+    transform 340ms cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+.voice-orb.is-transitioning .orb-rings span,
+.voice-orb.is-transitioning .particle-field span,
+.voice-orb.is-transitioning .orb-waveform span {
+  animation-play-state: paused;
 }
 
 .control-panel {
@@ -500,6 +572,11 @@ button {
     transform 180ms ease;
 }
 
+.state-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
 .state-card {
   padding: 0.48rem 0.55rem;
   border: 1px solid rgb(239 243 250 / 12%);
@@ -544,9 +621,45 @@ button {
   text-shadow: 0 1px 0 rgb(0 0 0 / 38%);
 }
 
+.mic-button.is-active {
+  border-color: rgb(239 243 250 / 72%);
+  background: linear-gradient(180deg, #eff3fa 0%, #00e5c0 48%, #006c5c 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 70%),
+    0 0 24px rgb(239 243 250 / 22%);
+}
+
 .mic-button:hover,
-.state-card:hover {
+.state-card:not(:disabled):hover {
   transform: translateY(-1px);
+}
+
+.voice-status {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.35rem 0.45rem 0.15rem;
+  color: rgb(239 243 250 / 84%);
+  text-align: center;
+}
+
+.voice-status span {
+  color: var(--neon);
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.voice-status p {
+  display: -webkit-box;
+  max-height: 2.6rem;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .level-meter {
@@ -612,6 +725,27 @@ button {
 
   to {
     rotate: 360deg;
+  }
+}
+
+@keyframes particleFieldBreathe {
+  0%,
+  100% {
+    transform: translate3d(0, -6px, 0);
+  }
+
+  50% {
+    transform: translate3d(0, 10px, 0);
+  }
+}
+
+@keyframes particleFieldListeningPulse {
+  from {
+    transform: translateY(var(--orb-listen-y-start));
+  }
+
+  to {
+    transform: translateY(var(--orb-listen-y-end));
   }
 }
 

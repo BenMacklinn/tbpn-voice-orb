@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import tGraphicSrc from '../../t-graphic.png';
 
 export type OrbState = 'idle' | 'listening' | 'processing' | 'speaking';
@@ -20,12 +20,14 @@ const particles = Array.from({ length: 18 }, (_, index) => index);
 const waveformBars = Array.from({ length: 16 }, (_, index) => index);
 
 export function VoiceOrb({ state, level, micActive }: VoiceOrbProps) {
+  const previousStateRef = useRef(state);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const normalizedLevel = Math.min(1, Math.max(0, level));
   const visualLevel =
     state === 'listening'
       ? normalizedLevel
       : state === 'speaking'
-        ? Math.max(normalizedLevel, 0.34)
+        ? Math.max(normalizedLevel, 0.14)
         : state === 'processing'
           ? 0.28
           : 0.08;
@@ -38,7 +40,7 @@ export function VoiceOrb({ state, level, micActive }: VoiceOrbProps) {
   }[state];
   const ripple = visualLevel * 0.9 + stateEnergy * 0.25;
   const glow = 0.35 + visualLevel * 0.8 + stateEnergy * 0.25;
-  const scale = 1 + visualLevel * (state === 'listening' ? 0.2 : 0.12);
+  const scale = 1 + visualLevel * (state === 'listening' ? 0.2 : state === 'speaking' ? 0.15 : 0.12);
 
   const orbStyle = {
     '--orb-level': visualLevel.toFixed(3),
@@ -48,7 +50,8 @@ export function VoiceOrb({ state, level, micActive }: VoiceOrbProps) {
     '--orb-surface-scale': (1 + visualLevel * 0.09).toFixed(3),
     '--orb-processing-low': (scale * 0.96).toFixed(3),
     '--orb-processing-high': (scale * 1.02).toFixed(3),
-    '--orb-speaking-scale': (scale * 1.08).toFixed(3),
+    '--orb-speaking-scale': (scale * (1.01 + visualLevel * 0.045)).toFixed(3),
+    '--orb-speaking-y': `${(-5 - visualLevel * 10).toFixed(1)}px`,
     '--orb-listen-y-start': `${(visualLevel * -10).toFixed(1)}px`,
     '--orb-listen-y-end': `${(visualLevel * -22).toFixed(1)}px`,
     '--orb-float-y': `${(visualLevel * -18).toFixed(1)}px`,
@@ -74,9 +77,23 @@ export function VoiceOrb({ state, level, micActive }: VoiceOrbProps) {
     '--bar-high-scale': (0.8 + visualLevel * 1.25).toFixed(3),
   } as CSSProperties;
 
+  useEffect(() => {
+    if (previousStateRef.current === state) {
+      return;
+    }
+
+    previousStateRef.current = state;
+    setIsTransitioning(true);
+    const transitionTimer = window.setTimeout(() => {
+      setIsTransitioning(false);
+    }, 340);
+
+    return () => window.clearTimeout(transitionTimer);
+  }, [state]);
+
   return (
     <section
-      className={`voice-orb state-${state}`}
+      className={`voice-orb state-${state}${isTransitioning ? ' is-transitioning' : ''}`}
       style={orbStyle}
       aria-label={`Voice orb is ${stateLabels[state].toLowerCase()}`}
     >
