@@ -2,8 +2,14 @@ const XAI_CLIENT_SECRETS_URL = 'https://api.x.ai/v1/realtime/client_secrets';
 
 const noStoreHeaders = { 'Cache-Control': 'no-store' } as const;
 
+function getEnv(name: string): string | undefined {
+  const proc = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
+    .process;
+  return proc?.env?.[name]?.trim();
+}
+
 async function handleTokenRequest(): Promise<Response> {
-  const apiKey = process.env.XAI_API_KEY?.trim();
+  const apiKey = getEnv('XAI_API_KEY');
 
   if (!apiKey) {
     return Response.json(
