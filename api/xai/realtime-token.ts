@@ -43,10 +43,16 @@ async function handleTokenRequest(): Promise<Response> {
   }
 }
 
-export async function GET(): Promise<Response> {
-  return handleTokenRequest();
-}
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const method = request.method;
+    if (method !== 'GET' && method !== 'POST') {
+      return Response.json(
+        { error: 'Method not allowed' },
+        { status: 405, headers: noStoreHeaders },
+      );
+    }
 
-export async function POST(): Promise<Response> {
-  return handleTokenRequest();
-}
+    return handleTokenRequest();
+  },
+};
